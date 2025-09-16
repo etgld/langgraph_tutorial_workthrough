@@ -1,17 +1,19 @@
 # based on https://til.simonwillison.net/llms/python-react-pattern
-import openai
-import re
-import httpx
-import os
 from collections import deque
+
+from openai import OpenAI
+
 # Not sure why you would ever use .env if you didn't have to...
 # from dotenv import load_dotenv
-
-
-
-
 # _ = load_dotenv()
-from openai import OpenAI
+from .lesson_1_utils import action_re, known_actions, prompt
+import argparse
+argparser = argparse.ArgumentParser(description="")
+argparser.add_argument(
+    "--openai_api_key",
+    type=str,
+)
+
 class Agent:
     def __init__(self, client, system=""):
         self.system = system
@@ -30,14 +32,43 @@ class Agent:
 
     def execute(self):
         completion = self.client.chat.completions.create(
-                        model="gpt-4o", 
-                        temperature=0,
-                        messages=self.messages)
+            model="gpt-4o", temperature=0, messages=self.messages
+        )
         return completion.choices[0].message.content
-    
+
+
+def __query(client, question, system_prompt, max_turns=5):
+    i = 0
+    bot = Agent(client=client, system=system_prompt)
+    next_prompt = question
+    while i < max_turns:
+        i += 1
+        result = bot(next_prompt)
+        print(result)
+        actions = [action_re.match(a) for a in result.split("\n") if action_re.match(a)]
+        if actions:
+            # There is an action to run
+            action, action_input = actions[0].groups()
+            if action not in known_actions:
+                raise Exception(f"Unknown action: {action}: {action_input}")
+            print(f" -- running {action} {action_input}")
+            observation = known_actions[action](action_input)
+            print("Observation:", observation)
+            next_prompt = f"Observation: {observation}"
+        else:
+            return
+
+
+def __process(openai_api_key: str) -> None:
+    question = """I have 2 dogs, a border collie and a scottish terrier. \
+    What is their combined weight"""
+    client = OpenAI(api_key=openai_api_key)
+    __query(client, question, prompt)
+
 
 def main():
-    print("Hello from langgraph-tutorial-workthrough!")
+    args = argparser.parse_args()
+    __process(args.openai_api_key)
 
 
 if __name__ == "__main__":
