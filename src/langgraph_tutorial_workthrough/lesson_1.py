@@ -1,4 +1,5 @@
 # based on https://til.simonwillison.net/llms/python-react-pattern
+import argparse
 from collections import deque
 
 from openai import OpenAI
@@ -7,12 +8,13 @@ from openai import OpenAI
 # from dotenv import load_dotenv
 # _ = load_dotenv()
 from .lesson_1_utils import action_re, known_actions, prompt
-import argparse
+
 argparser = argparse.ArgumentParser(description="")
 argparser.add_argument(
     "--openai_api_key",
     type=str,
 )
+
 
 class Agent:
     def __init__(self, client, system=""):
