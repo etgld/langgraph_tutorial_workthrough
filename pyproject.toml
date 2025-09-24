@@ -21,6 +21,8 @@ dependencies = [
 "bs4",
 "duckduckgo_search",
 "pygments",
+"langgraph-checkpoint-sqlite",
+"aiosqlite",
 # "pygraphviz",
 "IPython"]
 
