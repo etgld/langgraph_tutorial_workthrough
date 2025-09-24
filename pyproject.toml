@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["ruff", "openai", "httpx", "langgraph","langchain_community", "langchain_openai",
+dependencies = ["ruff", "openai", "httpx", "langgraph","langchain_community", "langchain_openai", "ty",
 "langchain_tavily",
 # "pygraphviz",
 "IPython"]

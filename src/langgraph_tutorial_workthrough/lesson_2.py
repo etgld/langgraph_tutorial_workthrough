@@ -1,32 +1,24 @@
 import argparse
 import operator
-from collections import deque
 from typing import Annotated, TypedDict
 
-from IPython.display import Image
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_openai import ChatOpenAI
+
 # from langchain_community.tools.tavily_search import TavilySearchResults
 # deprecated per warning
 from langchain_tavily import TavilySearch
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-argparser = argparse.ArgumentParser(description="")
+from .api_keys import OPENAI_API_KEY, TAVILY_API_KEY
 from .lesson_2_utils import prompt
+
+argparser = argparse.ArgumentParser(description="")
 
 argparser.add_argument(
     "--openai_model",
     type=str,
     default="gpt-3.5-turbo",
-)
-argparser.add_argument(
-    "--openai_api_key",
-    type=str,
-)
-
-argparser.add_argument(
-    "--tavily_api_key",
-    type=str,
 )
 
 
@@ -88,14 +80,12 @@ class Agent:
         return {"messages": results}
 
 
-def __process(
-    openai_model: str, system_prompt: str, openai_api_key: str, tavily_api_key: str
-) -> None:
+def __process(openai_model: str, system_prompt: str) -> None:
     model = ChatOpenAI(
-        api_key=openai_api_key, model=openai_model
+        api_key=OPENAI_API_KEY, model=openai_model
     )  # reduce inference cost
     tool = TavilySearch(
-        tavily_api_key=tavily_api_key, max_results=4
+        tavily_api_key=TAVILY_API_KEY, max_results=4
     )  # increased number of results
     abot = Agent(model, [tool], system=system_prompt)
     # Image(abot.graph.get_graph().draw_png())
@@ -115,7 +105,7 @@ def __process(
     messages = [HumanMessage(content=query)]
 
     model = ChatOpenAI(
-        api_key=openai_api_key, model="gpt-4o"
+        api_key=OPENAI_API_KEY, model="gpt-4o"
     )  # requires more advanced model
     abot = Agent(model, [tool], system=system_prompt)
     result = abot.graph.invoke({"messages": messages})
@@ -124,7 +114,7 @@ def __process(
 
 def main():
     args = argparser.parse_args()
-    __process(args.openai_model, prompt, args.openai_api_key, args.tavily_api_key)
+    __process(args.openai_model, prompt)
 
 
 if __name__ == "__main__":

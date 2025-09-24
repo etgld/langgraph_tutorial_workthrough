@@ -1,19 +1,14 @@
 # based on https://til.simonwillison.net/llms/python-react-pattern
-import argparse
 from collections import deque
 
 from openai import OpenAI
+
+from .api_keys import OPENAI_API_KEY
 
 # Not sure why you would ever use .env if you didn't have to...
 # from dotenv import load_dotenv
 # _ = load_dotenv()
 from .lesson_1_utils import action_re, known_actions, prompt
-
-argparser = argparse.ArgumentParser(description="")
-argparser.add_argument(
-    "--openai_api_key",
-    type=str,
-)
 
 
 class Agent:
@@ -61,16 +56,11 @@ def __query(client, question, system_prompt, max_turns=5):
             return
 
 
-def __process(openai_api_key: str) -> None:
+def main():
     question = """I have 2 dogs, a border collie and a scottish terrier. \
     What is their combined weight"""
-    client = OpenAI(api_key=openai_api_key)
+    client = OpenAI(api_key=OPENAI_API_KEY)
     __query(client, question, prompt)
-
-
-def main():
-    args = argparser.parse_args()
-    __process(args.openai_api_key)
 
 
 if __name__ == "__main__":
