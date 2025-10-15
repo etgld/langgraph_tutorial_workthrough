@@ -23,7 +23,8 @@ dependencies = [
 "pygments",
 "langgraph-checkpoint-sqlite",
 "aiosqlite",
-# "pygraphviz",
+"pydantic",
+"gradio",
 "IPython"]
 
 [tool.setuptools.packages.find]
