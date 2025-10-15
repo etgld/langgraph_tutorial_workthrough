@@ -1,9 +1,11 @@
+from IPython.display import Image, display
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langchain_tavily import TavilySearch
 from langgraph.checkpoint.sqlite import SqliteSaver
-from .api_keys import TAVILY_API_KEY, OPENAI_API_KEY
-from .lesson_5_utils import Agent
+
+from .api_keys import OPENAI_API_KEY, TAVILY_API_KEY
+from .lesson_5_utils import SOPRANO_SULLIVANT, Agent, graph_builder
 
 
 def thread_and_state_change_experiments() -> None:
@@ -113,16 +115,76 @@ def thread_and_state_change_experiments() -> None:
         )
 
         for event in abot.graph.stream(None, branch_and_add):
-            for k, v in event.items():
+            for v in event.values():
                 print(v)
 
 
-def time_travel() -> None:
-    pass
+# def time_travel() -> None:
+#     pass
+
+
+def graph_experiment(
+    scratch_prompt: str = SOPRANO_SULLIVANT, state_limit: int = 3
+) -> None:
+    builder = graph_builder(state_limit)
+    with SqliteSaver.from_conn_string(":memory:") as memory:
+        graph = builder.compile(checkpointer=memory)
+        thread = {"configurable": {"thread_id": "1"}}
+        graph.invoke(
+            {
+                "count": 0,
+                "scratch": scratch_prompt,
+            },
+            thread,
+        )
+        graph.get_state(thread)
+        for state in graph.get_state_history(thread):
+            print(state, "\n")
+        states = []
+        for state in graph.get_state_history(thread):
+            states.append(state.config)
+            print(state.config, state.values["count"])
+        # "Time travel"
+        restore_backwards = -state_limit
+        states[restore_backwards]
+        graph.get_state(states[restore_backwards])
+        graph.invoke(None, states[restore_backwards])
+        thread = {"configurable": {"thread_id": str(1)}}
+        for state in graph.get_state_history(thread):
+            print(state.config, state.values["count"])
+        thread = {"configurable": {"thread_id": str(1)}}
+        for state in graph.get_state_history(thread):
+            print(state, "\n")
+        thread2 = {"configurable": {"thread_id": str(2)}}
+        graph.invoke({"count": 0, "scratch": scratch_prompt}, thread2)
+        display(Image(graph.get_graph().draw_mermaid_png()))
+        states2 = []
+        for state in graph.get_state_history(thread2):
+            states2.append(state.config)
+            print(state.config, state.values["count"])
+        save_state = graph.get_state(states2[restore_backwards])
+        save_state
+        save_state.values["count"] = restore_backwards
+        save_state.values["scratch"] = scratch_prompt
+        save_state
+        graph.update_state(thread2, save_state.values)
+        for i, state in enumerate(graph.get_state_history(thread2)):
+            if i >= state_limit:  # print latest up to state limit
+                break
+            print(state, "\n")
+        graph.update_state(thread2, save_state.values, as_node="Node1")
+        for i, state in enumerate(graph.get_state_history(thread2)):
+            if i >= state_limit:  # print latest up to state limit
+                break
+            print(state, "\n")
+        graph.invoke(None, thread2)
+        for state in graph.get_state_history(thread2):
+            print(state, "\n")
 
 
 def main() -> None:
     thread_and_state_change_experiments()
+    graph_experiment()
 
 
 if __name__ == "__main__":
