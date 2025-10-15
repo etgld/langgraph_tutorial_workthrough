@@ -256,8 +256,6 @@ class WriterGUI:
         with SqliteSaver.from_conn_string(":memory:") as memory:
             compiled_graph = self.get_compiled_graph(memory)
             current_state = compiled_graph.get_state(self.thread)
-            print("HERE")
-            print(current_state)
             lnode = current_state.values.get("lnode")
             acount = current_state.values.get("count")
             rev = current_state.values.get("revision_number")
@@ -266,27 +264,32 @@ class WriterGUI:
             return lnode, nnode, self.thread_id, rev, acount
 
     def get_state(self, key):
-        current_values = self.graph.get_state(self.thread)
-        if key in current_values.values:
-            lnode, nnode, self.thread_id, rev, astep = self.get_disp_state()
-            new_label = f"last_node: {lnode}, thread_id: {self.thread_id}, rev: {rev}, step: {astep}"
-            return gr.update(label=new_label, value=current_values.values[key])
-        else:
-            return ""
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            current_state = compiled_graph.get_state(self.thread)
+            if key in current_state.values:
+                lnode, nnode, self.thread_id, rev, astep = self.get_disp_state()
+                new_label = f"last_node: {lnode}, thread_id: {self.thread_id}, rev: {rev}, step: {astep}"
+                return gr.update(label=new_label, value=current_state.values[key])
+            else:
+                return ""
 
     def get_content(
         self,
     ):
-        current_values = self.graph.get_state(self.thread)
-        if "content" in current_values.values:
-            content = current_values.values["content"]
-            lnode, nnode, thread_id, rev, astep = self.get_disp_state()
-            new_label = f"last_node: {lnode}, thread_id: {self.thread_id}, rev: {rev}, step: {astep}"
-            return gr.update(
-                label=new_label, value="\n\n".join(item for item in content) + "\n\n"
-            )
-        else:
-            return ""
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            current_state = compiled_graph.get_state(self.thread)
+            if "content" in current_state.values:
+                content = current_state.values["content"]
+                lnode, nnode, thread_id, rev, astep = self.get_disp_state()
+                new_label = f"last_node: {lnode}, thread_id: {self.thread_id}, rev: {rev}, step: {astep}"
+                return gr.update(
+                    label=new_label,
+                    value="\n\n".join(item for item in content) + "\n\n",
+                )
+            else:
+                return ""
 
     def update_hist_pd(
         self,
@@ -294,30 +297,35 @@ class WriterGUI:
         # print("update_hist_pd")
         hist = []
         # curiously, this generator returns the latest first
-        for state in self.graph.get_state_history(self.thread):
-            if state.metadata["step"] < 1:
-                continue
-            thread_ts = state.config["configurable"]["thread_ts"]
-            tid = state.config["configurable"]["thread_id"]
-            count = state.values["count"]
-            lnode = state.values["lnode"]
-            rev = state.values["revision_number"]
-            nnode = state.next
-            st = f"{tid}:{count}:{lnode}:{nnode}:{rev}:{thread_ts}"
-            hist.append(st)
-        return gr.Dropdown(
-            label="update_state from: thread:count:last_node:next_node:rev:thread_ts",
-            choices=hist,
-            value=hist[0],
-            interactive=True,
-        )
+
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            for state in compiled_graph.get_state_history(self.thread):
+                if state.metadata["step"] < 1:
+                    continue
+                thread_ts = state.config["configurable"]["thread_ts"]
+                tid = state.config["configurable"]["thread_id"]
+                count = state.values["count"]
+                lnode = state.values["lnode"]
+                rev = state.values["revision_number"]
+                nnode = state.next
+                st = f"{tid}:{count}:{lnode}:{nnode}:{rev}:{thread_ts}"
+                hist.append(st)
+            return gr.Dropdown(
+                label="update_state from: thread:count:last_node:next_node:rev:thread_ts",
+                choices=hist,
+                value=hist[0],
+                interactive=True,
+            )
 
     def find_config(self, thread_ts):
-        for state in self.graph.get_state_history(self.thread):
-            config = state.config
-            if config["configurable"]["thread_ts"] == thread_ts:
-                return config
-        return None
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            for state in compiled_graph.get_state_history(self.thread):
+                config = state.config
+                if config["configurable"]["thread_ts"] == thread_ts:
+                    return config
+            return None
 
     def copy_state(self, hist_str):
         """result of selecting an old state from the step pulldown. Note does not change thread.
@@ -327,18 +335,20 @@ class WriterGUI:
         # print(f"copy_state from {thread_ts}")
         config = self.find_config(thread_ts)
         # print(config)
-        state = self.graph.get_state(config)
-        self.graph.update_state(
-            self.thread, state.values, as_node=state.values["lnode"]
-        )
-        new_state = self.graph.get_state(self.thread)  # should now match
-        new_thread_ts = new_state.config["configurable"]["thread_ts"]
-        # tid = new_state.config["configurable"]["thread_id"]
-        count = new_state.values["count"]
-        lnode = new_state.values["lnode"]
-        rev = new_state.values["revision_number"]
-        nnode = new_state.next
-        return lnode, nnode, new_thread_ts, rev, count
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            state = compiled_graph.get_state(config)
+            compiled_graph.update_state(
+                self.thread, state.values, as_node=state.values["lnode"]
+            )
+            new_state = compiled_graph.get_state(self.thread)  # should now match
+            new_thread_ts = new_state.config["configurable"]["thread_ts"]
+            # tid = new_state.config["configurable"]["thread_id"]
+            count = new_state.values["count"]
+            lnode = new_state.values["lnode"]
+            rev = new_state.values["revision_number"]
+            nnode = new_state.next
+            return lnode, nnode, new_thread_ts, rev, count
 
     def update_thread_pd(
         self,
@@ -362,10 +372,14 @@ class WriterGUI:
         note that this will create a new 'current state' node. If you do this multiple times with different keys, it will create
         one for each update. Note also that it doesn't resume after the update
         """
-        current_values = self.graph.get_state(self.thread)
-        current_values.values[key] = new_state
-        self.graph.update_state(self.thread, current_values.values, as_node=asnode)
-        return
+        with SqliteSaver.from_conn_string(":memory:") as memory:
+            compiled_graph = self.get_compiled_graph(memory)
+            current_values = compiled_graph.get_state(self.thread)
+            current_values.values[key] = new_state
+            compiled_graph.update_state(
+                self.thread, current_values.values, as_node=asnode
+            )
+            return
 
     def create_interface(self):
         with gr.Blocks(
@@ -392,7 +406,17 @@ class WriterGUI:
                         st = f"{s_tid}:{s_count}:{s_lnode}:{s_nnode}:{s_rev}:{s_thread_ts}"
                         hist.append(st)
                     if not current_state.metadata:  # handle init call
-                        return {}
+                        return {
+                            topic_bx: None,
+                            lnode_bx: None,
+                            count_bx: None,
+                            revision_bx: None,
+                            nnode_bx: None,
+                            threadid_bx: None,
+                            thread_pd: None,
+                            step_pd: None,
+                        }
+                        # return {}
                     else:
                         return {
                             topic_bx: current_state.values["task"],
@@ -418,19 +442,22 @@ class WriterGUI:
             def get_snapshots():
                 new_label = f"thread_id: {self.thread_id}, Summary of snapshots"
                 sstate = ""
-                for state in self.graph.get_state_history(self.thread):
-                    for key in ["plan", "draft", "critique"]:
-                        if key in state.values:
-                            state.values[key] = state.values[key][:80] + "..."
-                    if "content" in state.values:
-                        for i in range(len(state.values["content"])):
-                            state.values["content"][i] = (
-                                state.values["content"][i][:20] + "..."
-                            )
-                    if "writes" in state.metadata:
-                        state.metadata["writes"] = "not shown"
-                    sstate += str(state) + "\n\n"
-                return gr.update(label=new_label, value=sstate)
+
+                with SqliteSaver.from_conn_string(":memory:") as memory:
+                    compiled_graph = self.get_compiled_graph(memory)
+                    for state in compiled_graph.get_state_history(self.thread):
+                        for key in ["plan", "draft", "critique"]:
+                            if key in state.values:
+                                state.values[key] = state.values[key][:80] + "..."
+                        if "content" in state.values:
+                            for i in range(len(state.values["content"])):
+                                state.values["content"][i] = (
+                                    state.values["content"][i][:20] + "..."
+                                )
+                        if "writes" in state.metadata:
+                            state.metadata["writes"] = "not shown"
+                        sstate += str(state) + "\n\n"
+                    return gr.update(label=new_label, value=sstate)
 
             def vary_btn(stat):
                 # print(f"vary_btn{stat}")
